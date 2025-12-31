@@ -1,163 +1,177 @@
 let scene, camera, renderer, composer;
-let points, geometry;
-let positions, velocities, brightness;
-let attractors = [];
-
-const COUNT = 120000;     // 粒子规模（关键）
-const AREA = 1600;
-const BASE_COLOR = new THREE.Color(1.0, 0.75, 0.25);
+let textPoints = [], textGeo, textPos;
+let sparkGeo, sparkPos;
+let textParticles, sparks;
 
 init();
 animate();
 
+/* ---------------- 初始化 ---------------- */
 function init(){
   scene = new THREE.Scene();
 
-  camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 1, 5000);
+  camera = new THREE.PerspectiveCamera(
+    55,
+    window.innerWidth / window.innerHeight,
+    1,
+    4000
+  );
   camera.position.z = 900;
 
-  renderer = new THREE.WebGLRenderer({antialias:true});
-  renderer.setSize(innerWidth, innerHeight);
-  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
-  renderer.toneMapping = THREE.ReinhardToneMapping;
-  renderer.toneMappingExposure = 1.4;
+  renderer = new THREE.WebGLRenderer({ antialias:true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
+  renderer.setClearColor(0x000000,1);
   document.body.appendChild(renderer.domElement);
 
-  composer = new THREE.EffectComposer(renderer);
-  composer.addPass(new THREE.RenderPass(scene,camera));
-
-  const bloom = new THREE.UnrealBloomPass(
-    new THREE.Vector2(innerWidth,innerHeight),
-    1.4, 0.45, 0.15
+  /* -------- 后处理 Bloom -------- */
+  const renderPass = new THREE.RenderPass(scene, camera);
+  const bloomPass = new THREE.UnrealBloomPass(
+    new THREE.Vector2(window.innerWidth, window.innerHeight),
+    1.4,   // strength
+    0.55,  // radius
+    0.15   // threshold
   );
-  composer.addPass(bloom);
 
-  buildParticles();
-  buildTextAttractors();
+  composer = new THREE.EffectComposer(renderer);
+  composer.addPass(renderPass);
+  composer.addPass(bloomPass);
 
-  addEventListener('resize',onResize);
+  createTextParticles();
+  createSparks();
+
+  window.addEventListener("resize", onResize);
 }
 
-function buildParticles(){
-  geometry = new THREE.BufferGeometry();
-  positions  = new Float32Array(COUNT*3);
-  velocities = new Float32Array(COUNT*3);
-  brightness = new Float32Array(COUNT);
+/* ---------------- 文字粒子 ---------------- */
+function createTextParticles(){
+  const top = getTextPoints("2026 年", 170);
+  const bottom = getTextPoints("新年快乐", 150)
+    .map(p => ({ x:p.x, y:p.y - 230, z:0 }));
 
-  for(let i=0;i<COUNT;i++){
-    positions[i*3]   = (Math.random()-0.5)*AREA;
-    positions[i*3+1] = (Math.random()-0.5)*AREA;
-    positions[i*3+2] = (Math.random()-0.5)*AREA;
+  textPoints = [...top, ...bottom];
 
-    velocities[i*3]   = (Math.random()-0.5)*0.3;
-    velocities[i*3+1] = (Math.random()-0.5)*0.3;
-    velocities[i*3+2] = (Math.random()-0.5)*0.3;
+  textGeo = new THREE.BufferGeometry();
+  textPos = new Float32Array(textPoints.length * 3);
 
-    brightness[i] = Math.random();
+  for(let i=0;i<textPoints.length;i++){
+    textPos[i*3]   = (Math.random()-0.5)*2500;
+    textPos[i*3+1] = (Math.random()-0.5)*2500;
+    textPos[i*3+2] = (Math.random()-0.5)*1800;
   }
 
-  geometry.setAttribute('position',new THREE.BufferAttribute(positions,3));
-  geometry.setAttribute('aBright',new THREE.BufferAttribute(brightness,1));
+  textGeo.setAttribute("position", new THREE.BufferAttribute(textPos,3));
 
-  const material = new THREE.ShaderMaterial({
+  const mat = new THREE.PointsMaterial({
+    color: new THREE.Color(1.0,0.78,0.28),
+    size: 2.6,
     transparent:true,
+    opacity:1,
     depthWrite:false,
-    blending:THREE.AdditiveBlending,
-    uniforms:{
-      uColor:{value:BASE_COLOR}
-    },
-    vertexShader:`
-      attribute float aBright;
-      varying float vBright;
-      void main(){
-        vBright = aBright;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);
-        gl_PointSize = 1.8 + aBright*2.5;
-      }
-    `,
-    fragmentShader:`
-      uniform vec3 uColor;
-      varying float vBright;
-      void main(){
-        float d = length(gl_PointCoord-0.5);
-        float a = smoothstep(0.5,0.0,d);
-        gl_FragColor = vec4(uColor * (vBright*1.6), a);
-      }
-    `
+    blending:THREE.AdditiveBlending
   });
 
-  points = new THREE.Points(geometry,material);
-  scene.add(points);
+  textParticles = new THREE.Points(textGeo, mat);
+  scene.add(textParticles);
+
+  flyInText();
 }
 
-function buildTextAttractors(){
-  const make = (text,y,size)=>{
-    const c = document.createElement('canvas');
-    const ctx = c.getContext('2d');
-    c.width = 1400; c.height = 300;
-    ctx.fillStyle='#fff';
-    ctx.font = `bold ${size}px system-ui,PingFang SC`;
-    ctx.textAlign='center';
-    ctx.textBaseline='middle';
-    ctx.fillText(text,c.width/2,c.height/2);
+/* ---------------- 飞入动画 ---------------- */
+function flyInText(){
+  textPoints.forEach((t,i)=>{
+    gsap.to(textPos,{
+      duration:2.8,
+      delay:Math.random()*0.7,
+      ease:"power3.out",
+      [i*3]:t.x,
+      [i*3+1]:t.y,
+      [i*3+2]:t.z,
+      onUpdate:()=>textGeo.attributes.position.needsUpdate=true
+    });
+  });
+}
 
-    const data = ctx.getImageData(0,0,c.width,c.height).data;
-    for(let y0=0;y0<c.height;y0+=4){
-      for(let x0=0;x0<c.width;x0+=4){
-        if(data[(y0*c.width+x0)*4+3]>150){
-          attractors.push({
-            x:x0-c.width/2,
-            y:(c.height/2-y0)+y,
-            z:0
-          });
-        }
+/* ---------------- 火花粒子 ---------------- */
+function createSparks(){
+  const COUNT = 1200;
+  sparkGeo = new THREE.BufferGeometry();
+  sparkPos = new Float32Array(COUNT*3);
+
+  for(let i=0;i<COUNT;i++){
+    sparkPos[i*3]   = (Math.random()-0.5)*1800;
+    sparkPos[i*3+1] = (Math.random()-0.5)*1200;
+    sparkPos[i*3+2] = (Math.random()-0.5)*2000;
+  }
+
+  sparkGeo.setAttribute("position", new THREE.BufferAttribute(sparkPos,3));
+
+  const mat = new THREE.PointsMaterial({
+    color: new THREE.Color(1.0,0.6,0.2),
+    size:1.6,
+    transparent:true,
+    opacity:.75,
+    depthWrite:false,
+    blending:THREE.AdditiveBlending
+  });
+
+  sparks = new THREE.Points(sparkGeo, mat);
+  scene.add(sparks);
+}
+
+/* ---------------- 文字采样 ---------------- */
+function getTextPoints(text, fontSize){
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  canvas.width = 1600;
+  canvas.height = 420;
+
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle="#fff";
+  ctx.textAlign="center";
+  ctx.textBaseline="middle";
+  ctx.font=`900 ${fontSize}px system-ui,PingFang SC,Microsoft YaHei`;
+
+  ctx.fillText(text, canvas.width/2, canvas.height/2);
+
+  const data = ctx.getImageData(0,0,canvas.width,canvas.height).data;
+  const pts = [];
+  const step = 3;
+
+  for(let y=0;y<canvas.height;y+=step){
+    for(let x=0;x<canvas.width;x+=step){
+      const i = (y*canvas.width + x)*4;
+      if(data[i+3]>120){
+        pts.push({
+          x:x-canvas.width/2,
+          y:canvas.height/2-y,
+          z:0
+        });
       }
     }
-  };
-
-  make("2026 年", 120, 170);
-  make("新年快乐",-120, 140);
+  }
+  return pts;
 }
 
+/* ---------------- 动画循环 ---------------- */
 function animate(){
   requestAnimationFrame(animate);
 
-  for(let i=0;i<COUNT;i++){
-    let ix=i*3;
-
-    let ax=0,ay=0,az=0;
-    for(let j=0;j<attractors.length;j+=25){
-      const t=attractors[j];
-      let dx=t.x-positions[ix];
-      let dy=t.y-positions[ix+1];
-      let dz=t.z-positions[ix+2];
-      let d=Math.sqrt(dx*dx+dy*dy+dz*dz)+0.001;
-      let f=1.2/(d*d);
-      ax+=dx*f; ay+=dy*f; az+=dz*f;
-    }
-
-    velocities[ix]   += ax*0.0006;
-    velocities[ix+1] += ay*0.0006;
-    velocities[ix+2] += az*0.0006;
-
-    positions[ix]   += velocities[ix];
-    positions[ix+1] += velocities[ix+1];
-    positions[ix+2] += velocities[ix+2];
-
-    brightness[i] = 0.6 + Math.random()*0.4;
+  // 火花缓慢漂移
+  const arr = sparkGeo.attributes.position.array;
+  for(let i=0;i<arr.length;i+=3){
+    arr[i]   += Math.sin(Date.now()*0.001+i)*0.03;
+    arr[i+1] += Math.cos(Date.now()*0.001+i)*0.04;
   }
-
-  geometry.attributes.position.needsUpdate=true;
-  geometry.attributes.aBright.needsUpdate=true;
-
-  camera.position.z = 900 + Math.sin(Date.now()*0.0004)*20;
+  sparkGeo.attributes.position.needsUpdate = true;
 
   composer.render();
 }
 
+/* ---------------- resize ---------------- */
 function onResize(){
-  camera.aspect=innerWidth/innerHeight;
+  camera.aspect = window.innerWidth/window.innerHeight;
   camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth,innerHeight);
-  composer.setSize(innerWidth,innerHeight);
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  composer.setSize(window.innerWidth, window.innerHeight);
 }
