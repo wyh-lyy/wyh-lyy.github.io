@@ -13,9 +13,7 @@
       background: #000;
       overflow: hidden;
     }
-    canvas {
-      display: block;
-    }
+    canvas { display: block; }
   </style>
 </head>
 <body>
@@ -28,76 +26,72 @@ const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
 
 function resize() {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
+  canvas.width = innerWidth;
+  canvas.height = innerHeight;
 }
 resize();
-window.addEventListener("resize", resize);
+addEventListener("resize", resize);
 
 /* ================= 字体画布 ================= */
+const W = 1200, H = 500;
 const textCanvas = document.createElement("canvas");
-textCanvas.width = 1200;
-textCanvas.height = 500;
+textCanvas.width = W;
+textCanvas.height = H;
 const tctx = textCanvas.getContext("2d");
 
-tctx.clearRect(0, 0, textCanvas.width, textCanvas.height);
+tctx.clearRect(0, 0, W, H);
 tctx.fillStyle = "#fff";
 tctx.textAlign = "center";
 tctx.textBaseline = "middle";
 tctx.font = "bold 140px 'PingFang SC','Microsoft YaHei',system-ui,sans-serif";
 
-tctx.fillText("2026 年", textCanvas.width / 2, textCanvas.height / 2 - 90);
-tctx.fillText("新年快乐", textCanvas.width / 2, textCanvas.height / 2 + 90);
+tctx.fillText("2026 年", W / 2, H / 2 - 90);
+tctx.fillText("新年快乐", W / 2, H / 2 + 90);
 
-/* ================= 采样点 ================= */
-const img = tctx.getImageData(0, 0, textCanvas.width, textCanvas.height);
+/* ================= 点阵采样 ================= */
+const img = tctx.getImageData(0, 0, W, H);
 const dots = [];
 const gap = 4;
 
-for (let y = 0; y < textCanvas.height; y += gap) {
-  for (let x = 0; x < textCanvas.width; x += gap) {
-    const i = (y * textCanvas.width + x) * 4;
+for (let y = 0; y < H; y += gap) {
+  for (let x = 0; x < W; x += gap) {
+    const i = (y * W + x) * 4;
     if (img.data[i + 3] > 120) {
       dots.push({
-        // 目标位置
+        // 目标点
         tx: x,
         ty: y,
-
-        // 起始位置（随机分散）
-        x: Math.random() * textCanvas.width,
-        y: Math.random() * textCanvas.height,
-
+        // 起点：屏幕外 + 大范围
+        x: (Math.random() - 0.5) * W * 3,
+        y: (Math.random() - 0.5) * H * 3,
         alpha: 0
       });
     }
   }
 }
 
-/* ================= 动画参数 ================= */
-const duration = 1600;
+/* ================= 动画 ================= */
+const duration = 2000;
 let start = null;
 
-/* ================= 动画 ================= */
 function animate(t) {
   if (!start) start = t;
   const p = Math.min((t - start) / duration, 1);
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  const ox = (canvas.width - textCanvas.width) / 2;
-  const oy = (canvas.height - textCanvas.height) / 2;
+  const ox = (canvas.width - W) / 2;
+  const oy = (canvas.height - H) / 2;
+
+  // 强飞入缓动（关键）
+  const ease = 1 - Math.pow(1 - p, 4);
 
   dots.forEach(d => {
-    // 缓动（飞入感核心）
-    const ease = 1 - Math.pow(1 - p, 3);
+    const x = d.x + (d.tx - d.x) * ease;
+    const y = d.y + (d.ty - d.y) * ease;
 
-    const cx = d.x + (d.tx - d.x) * ease;
-    const cy = d.y + (d.ty - d.y) * ease;
-
-    d.alpha = ease;
-
-    ctx.fillStyle = `rgba(255, 204, 102, ${d.alpha})`;
-    ctx.fillRect(cx + ox, cy + oy, 2, 2);
+    ctx.fillStyle = `rgba(255,204,102,${ease})`;
+    ctx.fillRect(x + ox, y + oy, 2, 2);
   });
 
   if (p < 1) requestAnimationFrame(animate);
@@ -108,3 +102,4 @@ requestAnimationFrame(animate);
 
 </body>
 </html>
+
