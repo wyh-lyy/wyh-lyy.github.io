@@ -32,21 +32,21 @@ function resize(){
 resize();
 addEventListener("resize", resize);
 
-/* ================= 文案列表 ================= */
+/* ================= 分行文案 ================= */
 const texts = [
-  "铛铛铛！现在是2025年最奇怪奖评选时刻!",
-  "嘿嘿，恭喜刘钰妍被评为年度最奇怪性格奖！",
-  "因此祝愿，在2026年烦恼少一点，快乐多一点"
+  ["铛铛铛！","现在是2025年","最奇怪奖评选时刻！"],
+  ["嘿嘿，","恭喜刘钰妍","被评为年度","最奇怪性格奖！"],
+  ["因此祝愿，","在2026年","烦恼少一点，","快乐多一点"]
 ];
 
 let textIndex = 0;
 
-/* ================= 设计画布（固定） ================= */
+/* ================= 设计画布 ================= */
 const DESIGN_W = 1000;
-const DESIGN_H = 300;
+const DESIGN_H = 420;
 
-/* ================= 生成点阵 ================= */
-function buildDots(text){
+/* ================= 构建点阵 ================= */
+function buildDots(lines){
   const tc = document.createElement("canvas");
   tc.width = DESIGN_W;
   tc.height = DESIGN_H;
@@ -57,7 +57,13 @@ function buildDots(text){
   tctx.textAlign = "center";
   tctx.textBaseline = "middle";
   tctx.font = "bold 64px 'PingFang SC','Microsoft YaHei',system-ui,sans-serif";
-  tctx.fillText(text, DESIGN_W/2, DESIGN_H/2);
+
+  const lineHeight = 80;
+  const startY = DESIGN_H/2 - (lines.length-1)*lineHeight/2;
+
+  lines.forEach((line,i)=>{
+    tctx.fillText(line, DESIGN_W/2, startY + i*lineHeight);
+  });
 
   const img = tctx.getImageData(0,0,DESIGN_W,DESIGN_H);
   const dots = [];
@@ -78,9 +84,9 @@ function buildDots(text){
   return dots;
 }
 
-/* ================= 动画参数 ================= */
-const flyDuration = 1600;
-const stayDuration = 1500;
+/* ================= 动画参数（放慢） ================= */
+const flyDuration = 2600;
+const stayDuration = 2200;
 
 let dots = buildDots(texts[textIndex]);
 let start = null;
@@ -134,7 +140,7 @@ function animate(t){
       phase = "fly";
       start = t;
     }else{
-      return; // 最后一段停住
+      return;
     }
   }
 
