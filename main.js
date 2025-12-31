@@ -1,160 +1,163 @@
 let scene, camera, renderer, composer;
-let points, geometry, positions, targets;
-let sparks, sparkGeo, sparkPos;
+let points, geometry;
+let positions, velocities, brightness;
+let attractors = [];
+
+const COUNT = 120000;     // 粒子规模（关键）
+const AREA = 1600;
+const BASE_COLOR = new THREE.Color(1.0, 0.75, 0.25);
 
 init();
 animate();
 
-function init() {
+function init(){
   scene = new THREE.Scene();
 
-  camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 1, 3000);
-  camera.position.z = 750;
+  camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 1, 5000);
+  camera.position.z = 900;
 
-  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer = new THREE.WebGLRenderer({antialias:true});
   renderer.setSize(innerWidth, innerHeight);
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-  renderer.setClearColor(0x000000, 1);
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
   renderer.toneMapping = THREE.ReinhardToneMapping;
-  renderer.toneMappingExposure = 1.35;
+  renderer.toneMappingExposure = 1.4;
   document.body.appendChild(renderer.domElement);
 
-  // ===== 后处理 Bloom =====
   composer = new THREE.EffectComposer(renderer);
-  composer.addPass(new THREE.RenderPass(scene, camera));
+  composer.addPass(new THREE.RenderPass(scene,camera));
 
   const bloom = new THREE.UnrealBloomPass(
-    new THREE.Vector2(innerWidth, innerHeight),
-    1.25,   // 强度
-    0.85,   // 半径
-    0.15    // 阈值
+    new THREE.Vector2(innerWidth,innerHeight),
+    1.4, 0.45, 0.15
   );
   composer.addPass(bloom);
 
-  createTextParticles();
-  createSparks();
+  buildParticles();
+  buildTextAttractors();
 
-  window.addEventListener("resize", onResize);
+  addEventListener('resize',onResize);
 }
 
-function createTextParticles() {
-  const t1 = textPoints("2026 年", 170);
-  const t2 = textPoints("新年快乐", 150).map(p => ({
-    x: p.x,
-    y: p.y - 210,
-    z: 0
-  }));
-
-  targets = [...t1, ...t2];
-
+function buildParticles(){
   geometry = new THREE.BufferGeometry();
-  positions = new Float32Array(targets.length * 3);
+  positions  = new Float32Array(COUNT*3);
+  velocities = new Float32Array(COUNT*3);
+  brightness = new Float32Array(COUNT);
 
-  for (let i = 0; i < targets.length; i++) {
-    positions[i * 3]     = (Math.random() - 0.5) * 2400;
-    positions[i * 3 + 1] = (Math.random() - 0.5) * 2400;
-    positions[i * 3 + 2] = (Math.random() - 0.5) * 2000;
+  for(let i=0;i<COUNT;i++){
+    positions[i*3]   = (Math.random()-0.5)*AREA;
+    positions[i*3+1] = (Math.random()-0.5)*AREA;
+    positions[i*3+2] = (Math.random()-0.5)*AREA;
+
+    velocities[i*3]   = (Math.random()-0.5)*0.3;
+    velocities[i*3+1] = (Math.random()-0.5)*0.3;
+    velocities[i*3+2] = (Math.random()-0.5)*0.3;
+
+    brightness[i] = Math.random();
   }
 
-  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute('position',new THREE.BufferAttribute(positions,3));
+  geometry.setAttribute('aBright',new THREE.BufferAttribute(brightness,1));
 
-  const mat = new THREE.PointsMaterial({
-    color: new THREE.Color(1.0, 0.72, 0.25),
-    size: 2.4,
-    transparent: true,
-    opacity: 1,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending
+  const material = new THREE.ShaderMaterial({
+    transparent:true,
+    depthWrite:false,
+    blending:THREE.AdditiveBlending,
+    uniforms:{
+      uColor:{value:BASE_COLOR}
+    },
+    vertexShader:`
+      attribute float aBright;
+      varying float vBright;
+      void main(){
+        vBright = aBright;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);
+        gl_PointSize = 1.8 + aBright*2.5;
+      }
+    `,
+    fragmentShader:`
+      uniform vec3 uColor;
+      varying float vBright;
+      void main(){
+        float d = length(gl_PointCoord-0.5);
+        float a = smoothstep(0.5,0.0,d);
+        gl_FragColor = vec4(uColor * (vBright*1.6), a);
+      }
+    `
   });
 
-  points = new THREE.Points(geometry, mat);
+  points = new THREE.Points(geometry,material);
   scene.add(points);
-
-  flyIn();
 }
 
-function flyIn() {
-  targets.forEach((t, i) => {
-    gsap.to(positions, {
-      duration: 3.0,
-      delay: Math.random() * 0.6,
-      ease: "power3.out",
-      [i * 3]:     t.x,
-      [i * 3 + 1]: t.y,
-      [i * 3 + 2]: t.z,
-      onUpdate: () => geometry.attributes.position.needsUpdate = true
-    });
-  });
+function buildTextAttractors(){
+  const make = (text,y,size)=>{
+    const c = document.createElement('canvas');
+    const ctx = c.getContext('2d');
+    c.width = 1400; c.height = 300;
+    ctx.fillStyle='#fff';
+    ctx.font = `bold ${size}px system-ui,PingFang SC`;
+    ctx.textAlign='center';
+    ctx.textBaseline='middle';
+    ctx.fillText(text,c.width/2,c.height/2);
+
+    const data = ctx.getImageData(0,0,c.width,c.height).data;
+    for(let y0=0;y0<c.height;y0+=4){
+      for(let x0=0;x0<c.width;x0+=4){
+        if(data[(y0*c.width+x0)*4+3]>150){
+          attractors.push({
+            x:x0-c.width/2,
+            y:(c.height/2-y0)+y,
+            z:0
+          });
+        }
+      }
+    }
+  };
+
+  make("2026 年", 120, 170);
+  make("新年快乐",-120, 140);
 }
 
-function createSparks() {
-  sparkGeo = new THREE.BufferGeometry();
-  sparkPos = new Float32Array(800 * 3);
-
-  for (let i = 0; i < 800; i++) {
-    sparkPos[i * 3]     = (Math.random() - 0.5) * 1200;
-    sparkPos[i * 3 + 1] = (Math.random() - 0.5) * 600;
-    sparkPos[i * 3 + 2] = (Math.random() - 0.5) * 600;
-  }
-
-  sparkGeo.setAttribute("position", new THREE.BufferAttribute(sparkPos, 3));
-
-  const mat = new THREE.PointsMaterial({
-    color: new THREE.Color(1.0, 0.55, 0.15),
-    size: 1.6,
-    transparent: true,
-    opacity: 0.9,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false
-  });
-
-  sparks = new THREE.Points(sparkGeo, mat);
-  scene.add(sparks);
-}
-
-function animate() {
+function animate(){
   requestAnimationFrame(animate);
 
-  // 火花漂浮
-  for (let i = 0; i < sparkPos.length; i += 3) {
-    sparkPos[i + 1] += 0.15;
-    if (sparkPos[i + 1] > 400) sparkPos[i + 1] = -400;
+  for(let i=0;i<COUNT;i++){
+    let ix=i*3;
+
+    let ax=0,ay=0,az=0;
+    for(let j=0;j<attractors.length;j+=25){
+      const t=attractors[j];
+      let dx=t.x-positions[ix];
+      let dy=t.y-positions[ix+1];
+      let dz=t.z-positions[ix+2];
+      let d=Math.sqrt(dx*dx+dy*dy+dz*dz)+0.001;
+      let f=1.2/(d*d);
+      ax+=dx*f; ay+=dy*f; az+=dz*f;
+    }
+
+    velocities[ix]   += ax*0.0006;
+    velocities[ix+1] += ay*0.0006;
+    velocities[ix+2] += az*0.0006;
+
+    positions[ix]   += velocities[ix];
+    positions[ix+1] += velocities[ix+1];
+    positions[ix+2] += velocities[ix+2];
+
+    brightness[i] = 0.6 + Math.random()*0.4;
   }
-  sparkGeo.attributes.position.needsUpdate = true;
+
+  geometry.attributes.position.needsUpdate=true;
+  geometry.attributes.aBright.needsUpdate=true;
+
+  camera.position.z = 900 + Math.sin(Date.now()*0.0004)*20;
 
   composer.render();
 }
 
-function textPoints(text, size) {
-  const c = document.createElement("canvas");
-  const ctx = c.getContext("2d");
-  c.width = 1400;
-  c.height = 400;
-
-  ctx.clearRect(0, 0, c.width, c.height);
-  ctx.fillStyle = "#fff";
-  ctx.font = `bold ${size}px system-ui, PingFang SC, Microsoft YaHei`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(text, c.width / 2, c.height / 2);
-
-  const img = ctx.getImageData(0, 0, c.width, c.height).data;
-  const pts = [];
-  const step = 3;
-
-  for (let y = 0; y < c.height; y += step) {
-    for (let x = 0; x < c.width; x += step) {
-      if (img[(y * c.width + x) * 4 + 3] > 128) {
-        pts.push({ x: x - c.width / 2, y: c.height / 2 - y, z: 0 });
-      }
-    }
-  }
-  return pts;
-}
-
-function onResize() {
-  camera.aspect = innerWidth / innerHeight;
+function onResize(){
+  camera.aspect=innerWidth/innerHeight;
   camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth, innerHeight);
-  composer.setSize(innerWidth, innerHeight);
+  renderer.setSize(innerWidth,innerHeight);
+  composer.setSize(innerWidth,innerHeight);
 }
