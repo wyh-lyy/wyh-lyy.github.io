@@ -1,163 +1,97 @@
-/* ======================================================
-   GitHub Pages Safe Bloom Particle Text
-   - NO module / NO import
-   - Works with CDN three.js + examples/js
-   ====================================================== */
-
-console.log("Bloom Safe main.js loaded");
-
-// ---------- 基础防御 ----------
-if (!window.THREE) {
-  alert("THREE not loaded");
-  throw new Error("THREE not found");
-}
-if (!THREE.EffectComposer || !THREE.UnrealBloomPass) {
-  alert("Bloom not loaded (EffectComposer / UnrealBloomPass)");
-  throw new Error("Bloom classes missing");
-}
-
-// ---------- 场景 / 相机 / 渲染 ----------
+// =======================
+// 基础三件套
+// =======================
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x000000);
 
 const camera = new THREE.PerspectiveCamera(
-  45,
+  60,
   window.innerWidth / window.innerHeight,
   1,
-  2000
+  5000
 );
 camera.position.z = 600;
 
 const renderer = new THREE.WebGLRenderer({
   antialias: true,
-  alpha: false,
+  alpha: false
 });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setClearColor(0x000000, 1);
 document.body.appendChild(renderer.domElement);
 
-// ---------- 粒子文字 Canvas ----------
-const textCanvas = document.createElement("canvas");
-textCanvas.width = 1024;
-textCanvas.height = 512;
-const ctx = textCanvas.getContext("2d");
+// =======================
+// 光（防止黑屏）
+// =======================
+scene.add(new THREE.AmbientLight(0xffffff, 0.4));
 
-ctx.fillStyle = "black";
-ctx.fillRect(0, 0, textCanvas.width, textCanvas.height);
+const pointLight = new THREE.PointLight(0xffcc66, 2, 3000);
+pointLight.position.set(0, 0, 600);
+scene.add(pointLight);
 
-ctx.font = "bold 140px sans-serif";
-ctx.textAlign = "center";
-ctx.textBaseline = "middle";
-ctx.fillStyle = "#ffffff";
-ctx.fillText("2026 年", 512, 180);
-ctx.fillText("新年快乐", 512, 330);
+// =======================
+// 粒子文字（简化版，保证可见）
+// =======================
+const particles = new THREE.BufferGeometry();
+const count = 18000;
+const positions = new Float32Array(count * 3);
 
-const imageData = ctx.getImageData(
-  0,
-  0,
-  textCanvas.width,
-  textCanvas.height
-).data;
+for (let i = 0; i < count; i++) {
+  const i3 = i * 3;
+  const r = Math.random() * 250;
+  const theta = Math.random() * Math.PI * 2;
+  const phi = Math.random() * Math.PI;
 
-// ---------- 粒子生成 ----------
-const positions = [];
-const velocities = [];
-const colors = [];
-
-for (let y = 0; y < textCanvas.height; y += 3) {
-  for (let x = 0; x < textCanvas.width; x += 3) {
-    const i = (y * textCanvas.width + x) * 4;
-    if (imageData[i] > 10) {
-      const px = x - textCanvas.width / 2;
-      const py = textCanvas.height / 2 - y;
-
-      positions.push(px, py, 0);
-      velocities.push(
-        (Math.random() - 0.5) * 0.2,
-        (Math.random() - 0.5) * 0.2,
-        Math.random() * 0.3
-      );
-
-      colors.push(1.0, 0.75, 0.25); // 金色
-    }
-  }
+  positions[i3]     = r * Math.sin(phi) * Math.cos(theta);
+  positions[i3 + 1] = r * Math.cos(phi);
+  positions[i3 + 2] = r * Math.sin(phi) * Math.sin(theta);
 }
 
-const geometry = new THREE.BufferGeometry();
-geometry.setAttribute(
+particles.setAttribute(
   "position",
-  new THREE.Float32BufferAttribute(positions, 3)
-);
-geometry.setAttribute(
-  "color",
-  new THREE.Float32BufferAttribute(colors, 3)
+  new THREE.BufferAttribute(positions, 3)
 );
 
-const material = new THREE.PointsMaterial({
-  size: 2.2,
-  vertexColors: true,
+const particleMaterial = new THREE.PointsMaterial({
+  color: 0xffcc66,
+  size: 3,
   transparent: true,
   opacity: 0.9,
-  depthWrite: false,
   blending: THREE.AdditiveBlending,
+  depthWrite: false
 });
 
-const points = new THREE.Points(geometry, material);
-scene.add(points);
+const particleMesh = new THREE.Points(particles, particleMaterial);
+scene.add(particleMesh);
 
-// ---------- 第二层辉光粒子 ----------
-const glowMaterial = new THREE.PointsMaterial({
-  size: 4.5,
-  color: 0xffaa33,
-  transparent: true,
-  opacity: 0.15,
-  depthWrite: false,
-  blending: THREE.AdditiveBlending,
-});
-
-const glowPoints = new THREE.Points(geometry, glowMaterial);
-scene.add(glowPoints);
-
-// ---------- 后处理 Bloom ----------
+// =======================
+// Bloom 后处理
+// =======================
 const composer = new THREE.EffectComposer(renderer);
 composer.addPass(new THREE.RenderPass(scene, camera));
 
 const bloomPass = new THREE.UnrealBloomPass(
   new THREE.Vector2(window.innerWidth, window.innerHeight),
-  1.3,   // strength
-  0.6,   // radius
+  1.2,   // strength
+  0.4,   // radius
   0.15   // threshold
 );
 composer.addPass(bloomPass);
 
-// ---------- 动画 ----------
-const pos = geometry.attributes.position.array;
-
+// =======================
+// 动画
+// =======================
 function animate() {
   requestAnimationFrame(animate);
-
-  for (let i = 0; i < pos.length; i += 3) {
-    pos[i] += velocities[i];
-    pos[i + 1] += velocities[i + 1];
-    pos[i + 2] += velocities[i + 2];
-
-    // 呼吸感回拉
-    pos[i] *= 0.999;
-    pos[i + 1] *= 0.999;
-    pos[i + 2] *= 0.995;
-  }
-
-  geometry.attributes.position.needsUpdate = true;
-
-  glowPoints.rotation.z += 0.0005;
-
+  particleMesh.rotation.y += 0.0015;
+  particleMesh.rotation.x += 0.0008;
   composer.render();
 }
-
 animate();
 
-// ---------- 自适应 ----------
+// =======================
+// 自适应
+// =======================
 window.addEventListener("resize", () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
