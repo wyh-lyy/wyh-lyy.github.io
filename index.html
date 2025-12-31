@@ -1,94 +1,109 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8" />
-  <title>2026 新年快乐</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-  <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      height: 100%;
-      background: #000;
-      overflow: hidden;
-    }
-    canvas { display: block; }
-  </style>
+<meta charset="UTF-8" />
+<title>2026 新年快乐</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<style>
+html,body{
+  margin:0;
+  padding:0;
+  width:100%;
+  height:100%;
+  background:#000;
+  overflow:hidden;
+}
+canvas{display:block;}
+</style>
 </head>
 <body>
 
 <canvas id="c"></canvas>
 
 <script>
+/* ================= 基础 ================= */
 const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
 
-function resize() {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
+function resize(){
+  canvas.width = innerWidth;
+  canvas.height = innerHeight;
 }
 resize();
-window.addEventListener("resize", resize);
+addEventListener("resize", resize);
 
-/* ===== 字体画布 ===== */
+/* ================= 设计画布（固定！） ================= */
+const DESIGN_W = 1000;
+const DESIGN_H = 420;
+
+/* ================= 字体画布 ================= */
 const textCanvas = document.createElement("canvas");
-textCanvas.width = 1200;
-textCanvas.height = 520;
+textCanvas.width = DESIGN_W;
+textCanvas.height = DESIGN_H;
 const tctx = textCanvas.getContext("2d");
 
-tctx.clearRect(0, 0, textCanvas.width, textCanvas.height);
-tctx.fillStyle = "#ffffff";
+tctx.fillStyle = "#fff";
 tctx.textAlign = "center";
 tctx.textBaseline = "middle";
+tctx.font = "bold 140px 'PingFang SC','Microsoft YaHei',system-ui,sans-serif";
 
-/* ↓↓↓ 关键变化：缩小字体，对照你给的图 ↓↓↓ */
-tctx.font = "bold 118px 'PingFang SC','Microsoft YaHei',system-ui,sans-serif";
+tctx.fillText("2026 年", DESIGN_W/2, DESIGN_H/2 - 90);
+tctx.fillText("新年快乐", DESIGN_W/2, DESIGN_H/2 + 90);
 
-/* 两行 */
-tctx.fillText("2026 年", textCanvas.width / 2, textCanvas.height / 2 - 70);
-tctx.fillText("新年快乐", textCanvas.width / 2, textCanvas.height / 2 + 70);
-
-/* ===== 点阵采样 ===== */
-const img = tctx.getImageData(0, 0, textCanvas.width, textCanvas.height);
+/* ================= 点阵采样 ================= */
+const img = tctx.getImageData(0,0,DESIGN_W,DESIGN_H);
 const dots = [];
 const gap = 4;
 
-for (let y = 0; y < textCanvas.height; y += gap) {
-  for (let x = 0; x < textCanvas.width; x += gap) {
-    const i = (y * textCanvas.width + x) * 4;
-    if (img.data[i + 3] > 120) {
-      dots.push({ x, y });
+for(let y=0;y<DESIGN_H;y+=gap){
+  for(let x=0;x<DESIGN_W;x+=gap){
+    const i = (y*DESIGN_W+x)*4;
+    if(img.data[i+3]>120){
+      dots.push({
+        tx:x, ty:y,
+        x:(Math.random()-0.5)*DESIGN_W*3,
+        y:(Math.random()-0.5)*DESIGN_H*3
+      });
     }
   }
 }
 
-/* ===== 动画 ===== */
+/* ================= 动画 ================= */
+const duration = 1800;
 let start = null;
-const duration = 1000;
 
-function draw(t) {
-  if (!start) start = t;
-  const p = Math.min((t - start) / duration, 1);
+function animate(t){
+  if(!start) start = t;
+  const p = Math.min((t-start)/duration,1);
+  const ease = 1-Math.pow(1-p,4);
 
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.clearRect(0,0,canvas.width,canvas.height);
 
-  const ox = (canvas.width - textCanvas.width) / 2;
-  const oy = (canvas.height - textCanvas.height) / 2;
+  /* 关键：整体等比缩放进屏幕 */
+  const scale = Math.min(
+    canvas.width / DESIGN_W,
+    canvas.height / DESIGN_H
+  ) * 0.9;
 
-  ctx.fillStyle = "rgba(255,215,130,1)";
-  ctx.globalAlpha = p;
+  const ox = (canvas.width - DESIGN_W*scale)/2;
+  const oy = (canvas.height - DESIGN_H*scale)/2;
 
-  for (const d of dots) {
-    ctx.fillRect(d.x + ox, d.y + oy, 2, 2);
-  }
+  ctx.save();
+  ctx.translate(ox,oy);
+  ctx.scale(scale,scale);
 
-  ctx.globalAlpha = 1;
+  dots.forEach(d=>{
+    const x = d.x + (d.tx-d.x)*ease;
+    const y = d.y + (d.ty-d.y)*ease;
+    ctx.fillStyle = `rgba(255,204,102,${ease})`;
+    ctx.fillRect(x,y,2,2);
+  });
 
-  if (p < 1) requestAnimationFrame(draw);
+  ctx.restore();
+
+  if(p<1) requestAnimationFrame(animate);
 }
-
-requestAnimationFrame(draw);
+requestAnimationFrame(animate);
 </script>
 
 </body>
