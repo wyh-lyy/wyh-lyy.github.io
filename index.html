@@ -3,8 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <title>2026 新年快乐</title>
-  <meta name="viewport"
-        content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
   <style>
     html, body {
       margin: 0;
@@ -22,17 +21,8 @@
 <canvas id="c"></canvas>
 
 <script>
-/* ================= Canvas ================= */
 const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
-
-function getSafeArea() {
-  const style = getComputedStyle(document.documentElement);
-  return {
-    top: parseInt(style.getPropertyValue("--safe-area-inset-top")) || 0,
-    bottom: parseInt(style.getPropertyValue("--safe-area-inset-bottom")) || 0
-  };
-}
 
 function resize() {
   canvas.width = window.innerWidth;
@@ -41,83 +31,64 @@ function resize() {
 resize();
 window.addEventListener("resize", resize);
 
-/* ================= 字体画布（自适应） ================= */
-function createTextCanvas() {
-  const w = Math.min(window.innerWidth * 0.9, 900);
-  const h = w * 0.45;
-
-  const tc = document.createElement("canvas");
-  tc.width = w;
-  tc.height = h;
-  const tctx = tc.getContext("2d");
-
-  tctx.clearRect(0, 0, w, h);
-  tctx.fillStyle = "#fff";
-  tctx.textAlign = "center";
-  tctx.textBaseline = "middle";
-
-  const fontSize = w * 0.16;
-  tctx.font = `bold ${fontSize}px 'PingFang SC','Microsoft YaHei',system-ui,sans-serif`;
-
-  tctx.fillText("2026 年", w / 2, h / 2 - fontSize * 0.7);
-  tctx.fillText("新年快乐", w / 2, h / 2 + fontSize * 0.7);
-
-  return tc;
-}
-
-const textCanvas = createTextCanvas();
-const W = textCanvas.width;
-const H = textCanvas.height;
+/* ===== 字体画布 ===== */
+const textCanvas = document.createElement("canvas");
+textCanvas.width = 1200;
+textCanvas.height = 520;
 const tctx = textCanvas.getContext("2d");
 
-/* ================= 点阵采样 ================= */
-const img = tctx.getImageData(0, 0, W, H);
+tctx.clearRect(0, 0, textCanvas.width, textCanvas.height);
+tctx.fillStyle = "#ffffff";
+tctx.textAlign = "center";
+tctx.textBaseline = "middle";
+
+/* ↓↓↓ 关键变化：缩小字体，对照你给的图 ↓↓↓ */
+tctx.font = "bold 118px 'PingFang SC','Microsoft YaHei',system-ui,sans-serif";
+
+/* 两行 */
+tctx.fillText("2026 年", textCanvas.width / 2, textCanvas.height / 2 - 70);
+tctx.fillText("新年快乐", textCanvas.width / 2, textCanvas.height / 2 + 70);
+
+/* ===== 点阵采样 ===== */
+const img = tctx.getImageData(0, 0, textCanvas.width, textCanvas.height);
 const dots = [];
 const gap = 4;
 
-for (let y = 0; y < H; y += gap) {
-  for (let x = 0; x < W; x += gap) {
-    const i = (y * W + x) * 4;
+for (let y = 0; y < textCanvas.height; y += gap) {
+  for (let x = 0; x < textCanvas.width; x += gap) {
+    const i = (y * textCanvas.width + x) * 4;
     if (img.data[i + 3] > 120) {
-      dots.push({
-        tx: x,
-        ty: y,
-        x: (Math.random() - 0.5) * W * 3,
-        y: (Math.random() - 0.5) * H * 3
-      });
+      dots.push({ x, y });
     }
   }
 }
 
-/* ================= 动画 ================= */
-const duration = 2000;
+/* ===== 动画 ===== */
 let start = null;
+const duration = 1000;
 
-function animate(t) {
+function draw(t) {
   if (!start) start = t;
   const p = Math.min((t - start) / duration, 1);
-  const ease = 1 - Math.pow(1 - p, 4);
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  const safe = getSafeArea();
-  const usableHeight = canvas.height - safe.top - safe.bottom;
+  const ox = (canvas.width - textCanvas.width) / 2;
+  const oy = (canvas.height - textCanvas.height) / 2;
 
-  const ox = (canvas.width - W) / 2;
-  const oy = safe.top + (usableHeight - H) / 2;
+  ctx.fillStyle = "rgba(255,215,130,1)";
+  ctx.globalAlpha = p;
 
-  dots.forEach(d => {
-    const x = d.x + (d.tx - d.x) * ease;
-    const y = d.y + (d.ty - d.y) * ease;
+  for (const d of dots) {
+    ctx.fillRect(d.x + ox, d.y + oy, 2, 2);
+  }
 
-    ctx.fillStyle = `rgba(255,204,102,${ease})`;
-    ctx.fillRect(x + ox, y + oy, 2, 2);
-  });
+  ctx.globalAlpha = 1;
 
-  if (p < 1) requestAnimationFrame(animate);
+  if (p < 1) requestAnimationFrame(draw);
 }
 
-requestAnimationFrame(animate);
+requestAnimationFrame(draw);
 </script>
 
 </body>
