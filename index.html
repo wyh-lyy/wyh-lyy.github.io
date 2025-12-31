@@ -3,9 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <title>2026 新年快乐</title>
-
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-
   <style>
     html, body {
       margin: 0;
@@ -25,7 +23,6 @@
 <canvas id="c"></canvas>
 
 <script>
-/* ================= 基础设置 ================= */
 const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
 
@@ -36,69 +33,58 @@ function resize() {
 resize();
 window.addEventListener("resize", resize);
 
-/* ================= 字体画布（关键） ================= */
+/* ===== 字体画布 ===== */
 const textCanvas = document.createElement("canvas");
 textCanvas.width = 1200;
-textCanvas.height = 500;
+textCanvas.height = 600;
 const tctx = textCanvas.getContext("2d");
 
 tctx.clearRect(0, 0, textCanvas.width, textCanvas.height);
 tctx.fillStyle = "#ffffff";
 tctx.textAlign = "center";
 tctx.textBaseline = "middle";
+tctx.font = "bold 150px 'PingFang SC','Microsoft YaHei',system-ui,sans-serif";
 
-/* 字体：粗 + 系统字体（手机必有） */
-tctx.font = "bold 140px 'PingFang SC','Microsoft YaHei',system-ui,sans-serif";
-tctx.fillText("2026 年", textCanvas.width / 2, textCanvas.height / 2 - 90);
-tctx.fillText("新年快乐", textCanvas.width / 2, textCanvas.height / 2 + 90);
+tctx.fillText("2026 年", textCanvas.width / 2, textCanvas.height / 2 - 120);
+tctx.fillText("新年快乐", textCanvas.width / 2, textCanvas.height / 2 + 120);
 
-/* ================= 采样点阵 ================= */
+/* ===== 点阵采样 ===== */
 const img = tctx.getImageData(0, 0, textCanvas.width, textCanvas.height);
 const dots = [];
-const gap = 4;   // 点阵密度（越小越密）
+const gap = 4;
 
 for (let y = 0; y < textCanvas.height; y += gap) {
   for (let x = 0; x < textCanvas.width; x += gap) {
     const i = (y * textCanvas.width + x) * 4;
     if (img.data[i + 3] > 120) {
-      dots.push({
-        x,
-        y,
-        alpha: 0
-      });
+      dots.push({ x, y, a: 0 });
     }
   }
 }
 
-/* ================= 动画参数 ================= */
-let startTime = null;
+/* ===== 动画 ===== */
+let start = null;
 const duration = 1200;
 
-/* ================= 渲染 ================= */
-function draw(timestamp) {
-  if (!startTime) startTime = timestamp;
-  const progress = Math.min((timestamp - startTime) / duration, 1);
+function draw(t) {
+  if (!start) start = t;
+  const p = Math.min((t - start) / duration, 1);
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  const offsetX = (canvas.width - textCanvas.width) / 2;
-  const offsetY = (canvas.height - textCanvas.height) / 2;
+  const ox = (canvas.width - textCanvas.width) / 2;
+  const oy = (canvas.height - textCanvas.height) / 2;
 
-  dots.forEach(d => {
-    d.alpha = progress;
+  ctx.fillStyle = "rgba(255,215,130,1)";
 
-    ctx.fillStyle = `rgba(255, 204, 102, ${d.alpha})`;
-    ctx.fillRect(
-      d.x + offsetX,
-      d.y + offsetY,
-      2,
-      2
-    );
-  });
-
-  if (progress < 1) {
-    requestAnimationFrame(draw);
+  for (const d of dots) {
+    ctx.globalAlpha = p;
+    ctx.fillRect(d.x + ox, d.y + oy, 2, 2);
   }
+
+  ctx.globalAlpha = 1;
+
+  if (p < 1) requestAnimationFrame(draw);
 }
 
 requestAnimationFrame(draw);
