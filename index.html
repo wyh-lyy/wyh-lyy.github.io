@@ -41,9 +41,9 @@ const texts = [
 
 let textIndex = 0;
 
-/* ================= 设计画布 ================= */
+/* ================= 设计画布（更高，铺开上下） ================= */
 const DESIGN_W = 1000;
-const DESIGN_H = 420;
+const DESIGN_H = 560;   // ⬅️ 比之前更高
 
 /* ================= 构建点阵 ================= */
 function buildDots(lines){
@@ -57,10 +57,10 @@ function buildDots(lines){
   tctx.textAlign = "center";
   tctx.textBaseline = "middle";
 
-  /* 字体稍微放大 */
-  tctx.font = "bold 72px 'PingFang SC','Microsoft YaHei',system-ui,sans-serif";
+  /* 字体再大一点 */
+  tctx.font = "bold 84px 'PingFang SC','Microsoft YaHei',system-ui,sans-serif";
 
-  const lineHeight = 88;
+  const lineHeight = 110;   // ⬅️ 行距同步放大
   const startY = DESIGN_H/2 - (lines.length-1)*lineHeight/2;
 
   lines.forEach((line,i)=>{
@@ -86,9 +86,9 @@ function buildDots(lines){
   return dots;
 }
 
-/* ================= 动画参数 ================= */
-const flyDuration  = 4200;
-const stayDuration = 4200;
+/* ================= 动画参数（再慢一点） ================= */
+const flyDuration  = 5000; // 飞入
+const stayDuration = 5200; // 停留
 
 let dots = buildDots(texts[textIndex]);
 let start = null;
@@ -104,7 +104,7 @@ function animate(t){
   const scale = Math.min(
     canvas.width / DESIGN_W,
     canvas.height / DESIGN_H
-  ) * 0.9;
+  ) * 0.92;   // ⬅️ 让文字更“撑满”
 
   const ox = (canvas.width - DESIGN_W*scale)/2;
   const oy = (canvas.height - DESIGN_H*scale)/2;
@@ -130,7 +130,7 @@ function animate(t){
     const x = d.x + (d.tx-d.x)*ease;
     const y = d.y + (d.ty-d.y)*ease;
 
-    /* 更深的金色 */
+    /* 深金色 */
     ctx.fillStyle = `rgba(220,170,80,${alpha})`;
     ctx.fillRect(x,y,2,2);
   });
