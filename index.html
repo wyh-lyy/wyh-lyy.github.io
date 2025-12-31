@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <title>2026 新年快乐</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
   <style>
     html, body {
       margin: 0;
@@ -21,32 +22,53 @@
 <canvas id="c"></canvas>
 
 <script>
-/* ================= 基础 ================= */
+/* ================= Canvas ================= */
 const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
 
+function getSafeArea() {
+  const style = getComputedStyle(document.documentElement);
+  return {
+    top: parseInt(style.getPropertyValue("--safe-area-inset-top")) || 0,
+    bottom: parseInt(style.getPropertyValue("--safe-area-inset-bottom")) || 0
+  };
+}
+
 function resize() {
-  canvas.width = innerWidth;
-  canvas.height = innerHeight;
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
 }
 resize();
-addEventListener("resize", resize);
+window.addEventListener("resize", resize);
 
-/* ================= 字体画布 ================= */
-const W = 1200, H = 500;
-const textCanvas = document.createElement("canvas");
-textCanvas.width = W;
-textCanvas.height = H;
+/* ================= 字体画布（自适应） ================= */
+function createTextCanvas() {
+  const w = Math.min(window.innerWidth * 0.9, 900);
+  const h = w * 0.45;
+
+  const tc = document.createElement("canvas");
+  tc.width = w;
+  tc.height = h;
+  const tctx = tc.getContext("2d");
+
+  tctx.clearRect(0, 0, w, h);
+  tctx.fillStyle = "#fff";
+  tctx.textAlign = "center";
+  tctx.textBaseline = "middle";
+
+  const fontSize = w * 0.16;
+  tctx.font = `bold ${fontSize}px 'PingFang SC','Microsoft YaHei',system-ui,sans-serif`;
+
+  tctx.fillText("2026 年", w / 2, h / 2 - fontSize * 0.7);
+  tctx.fillText("新年快乐", w / 2, h / 2 + fontSize * 0.7);
+
+  return tc;
+}
+
+const textCanvas = createTextCanvas();
+const W = textCanvas.width;
+const H = textCanvas.height;
 const tctx = textCanvas.getContext("2d");
-
-tctx.clearRect(0, 0, W, H);
-tctx.fillStyle = "#fff";
-tctx.textAlign = "center";
-tctx.textBaseline = "middle";
-tctx.font = "bold 140px 'PingFang SC','Microsoft YaHei',system-ui,sans-serif";
-
-tctx.fillText("2026 年", W / 2, H / 2 - 90);
-tctx.fillText("新年快乐", W / 2, H / 2 + 90);
 
 /* ================= 点阵采样 ================= */
 const img = tctx.getImageData(0, 0, W, H);
@@ -58,13 +80,10 @@ for (let y = 0; y < H; y += gap) {
     const i = (y * W + x) * 4;
     if (img.data[i + 3] > 120) {
       dots.push({
-        // 目标点
         tx: x,
         ty: y,
-        // 起点：屏幕外 + 大范围
         x: (Math.random() - 0.5) * W * 3,
-        y: (Math.random() - 0.5) * H * 3,
-        alpha: 0
+        y: (Math.random() - 0.5) * H * 3
       });
     }
   }
@@ -77,14 +96,15 @@ let start = null;
 function animate(t) {
   if (!start) start = t;
   const p = Math.min((t - start) / duration, 1);
+  const ease = 1 - Math.pow(1 - p, 4);
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  const ox = (canvas.width - W) / 2;
-  const oy = (canvas.height - H) / 2;
+  const safe = getSafeArea();
+  const usableHeight = canvas.height - safe.top - safe.bottom;
 
-  // 强飞入缓动（关键）
-  const ease = 1 - Math.pow(1 - p, 4);
+  const ox = (canvas.width - W) / 2;
+  const oy = safe.top + (usableHeight - H) / 2;
 
   dots.forEach(d => {
     const x = d.x + (d.tx - d.x) * ease;
@@ -102,4 +122,3 @@ requestAnimationFrame(animate);
 
 </body>
 </html>
-
