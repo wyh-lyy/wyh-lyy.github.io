@@ -1,148 +1,160 @@
-/* =========================================================
-   2026 新年快乐 · 粒子飞入 · 发光 · 视频级 90%+
-   ========================================================= */
-
-let scene, camera, renderer, points, geometry;
-let positions, targets, basePositions;
-let clock = new THREE.Clock();
+let scene, camera, renderer, composer;
+let points, geometry, positions, targets;
+let sparks, sparkGeo, sparkPos;
 
 init();
 animate();
 
-/* ================= 初始化 ================= */
 function init() {
   scene = new THREE.Scene();
 
-  camera = new THREE.PerspectiveCamera(
-    60,
-    window.innerWidth / window.innerHeight,
-    1,
-    4000
-  );
-  camera.position.z = 900;
+  camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 1, 3000);
+  camera.position.z = 750;
 
   renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.setClearColor(0x000000, 1);
+  renderer.toneMapping = THREE.ReinhardToneMapping;
+  renderer.toneMappingExposure = 1.35;
   document.body.appendChild(renderer.domElement);
 
-  createParticles();
+  // ===== 后处理 Bloom =====
+  composer = new THREE.EffectComposer(renderer);
+  composer.addPass(new THREE.RenderPass(scene, camera));
+
+  const bloom = new THREE.UnrealBloomPass(
+    new THREE.Vector2(innerWidth, innerHeight),
+    1.25,   // 强度
+    0.85,   // 半径
+    0.15    // 阈值
+  );
+  composer.addPass(bloom);
+
+  createTextParticles();
+  createSparks();
+
   window.addEventListener("resize", onResize);
 }
 
-/* ================= 生成粒子 ================= */
-function createParticles() {
-  const textTop = getTextPoints("2026 年", 170);
-  const textBottom = getTextPoints("新年快乐", 150).map(p => ({
+function createTextParticles() {
+  const t1 = textPoints("2026 年", 170);
+  const t2 = textPoints("新年快乐", 150).map(p => ({
     x: p.x,
-    y: p.y - 220,
-    z: p.z
+    y: p.y - 210,
+    z: 0
   }));
 
-  targets = [...textTop, ...textBottom];
-  geometry = new THREE.BufferGeometry();
+  targets = [...t1, ...t2];
 
+  geometry = new THREE.BufferGeometry();
   positions = new Float32Array(targets.length * 3);
-  basePositions = new Float32Array(targets.length * 3);
 
   for (let i = 0; i < targets.length; i++) {
-    // 初始：随机远处（飞入）
-    positions[i * 3]     = (Math.random() - 0.5) * 2600;
-    positions[i * 3 + 1] = (Math.random() - 0.5) * 2000;
-    positions[i * 3 + 2] = (Math.random() - 0.5) * 2400;
-
-    // 目标位置（存一份用于呼吸动画）
-    basePositions[i * 3]     = targets[i].x;
-    basePositions[i * 3 + 1] = targets[i].y;
-    basePositions[i * 3 + 2] = targets[i].z;
+    positions[i * 3]     = (Math.random() - 0.5) * 2400;
+    positions[i * 3 + 1] = (Math.random() - 0.5) * 2400;
+    positions[i * 3 + 2] = (Math.random() - 0.5) * 2000;
   }
 
   geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
 
-  const material = new THREE.PointsMaterial({
-    color: new THREE.Color(1.0, 0.78, 0.28), // 高级琥珀金
-    size: 3.0,
+  const mat = new THREE.PointsMaterial({
+    color: new THREE.Color(1.0, 0.72, 0.25),
+    size: 2.4,
     transparent: true,
-    opacity: 0.95,
+    opacity: 1,
     depthWrite: false,
-    blending: THREE.AdditiveBlending,
+    blending: THREE.AdditiveBlending
   });
 
-  points = new THREE.Points(geometry, material);
+  points = new THREE.Points(geometry, mat);
   scene.add(points);
 
   flyIn();
 }
 
-/* ================= 粒子飞入（核心） ================= */
 function flyIn() {
   targets.forEach((t, i) => {
     gsap.to(positions, {
-      duration: 2.8,
-      delay: Math.random() * 0.8,
+      duration: 3.0,
+      delay: Math.random() * 0.6,
       ease: "power3.out",
       [i * 3]:     t.x,
       [i * 3 + 1]: t.y,
       [i * 3 + 2]: t.z,
-      onUpdate: () => {
-        geometry.attributes.position.needsUpdate = true;
-      }
+      onUpdate: () => geometry.attributes.position.needsUpdate = true
     });
   });
 }
 
-/* ================= 呼吸 / 漂浮（视频感） ================= */
-function animate() {
-  requestAnimationFrame(animate);
-  const t = clock.getElapsedTime();
+function createSparks() {
+  sparkGeo = new THREE.BufferGeometry();
+  sparkPos = new Float32Array(800 * 3);
 
-  for (let i = 0; i < targets.length; i++) {
-    positions[i * 3 + 1] =
-      basePositions[i * 3 + 1] +
-      Math.sin(t * 1.4 + i * 0.15) * 3.5;
+  for (let i = 0; i < 800; i++) {
+    sparkPos[i * 3]     = (Math.random() - 0.5) * 1200;
+    sparkPos[i * 3 + 1] = (Math.random() - 0.5) * 600;
+    sparkPos[i * 3 + 2] = (Math.random() - 0.5) * 600;
   }
 
-  geometry.attributes.position.needsUpdate = true;
-  renderer.render(scene, camera);
+  sparkGeo.setAttribute("position", new THREE.BufferAttribute(sparkPos, 3));
+
+  const mat = new THREE.PointsMaterial({
+    color: new THREE.Color(1.0, 0.55, 0.15),
+    size: 1.6,
+    transparent: true,
+    opacity: 0.9,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false
+  });
+
+  sparks = new THREE.Points(sparkGeo, mat);
+  scene.add(sparks);
 }
 
-/* ================= 文字 → 点 ================= */
-function getTextPoints(text, size) {
-  const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d");
+function animate() {
+  requestAnimationFrame(animate);
 
-  canvas.width = 1500;
-  canvas.height = 400;
+  // 火花漂浮
+  for (let i = 0; i < sparkPos.length; i += 3) {
+    sparkPos[i + 1] += 0.15;
+    if (sparkPos[i + 1] > 400) sparkPos[i + 1] = -400;
+  }
+  sparkGeo.attributes.position.needsUpdate = true;
 
+  composer.render();
+}
+
+function textPoints(text, size) {
+  const c = document.createElement("canvas");
+  const ctx = c.getContext("2d");
+  c.width = 1400;
+  c.height = 400;
+
+  ctx.clearRect(0, 0, c.width, c.height);
   ctx.fillStyle = "#fff";
+  ctx.font = `bold ${size}px system-ui, PingFang SC, Microsoft YaHei`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.font = `bold ${size}px system-ui, PingFang SC, Microsoft YaHei`;
-  ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+  ctx.fillText(text, c.width / 2, c.height / 2);
 
-  const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+  const img = ctx.getImageData(0, 0, c.width, c.height).data;
   const pts = [];
-  const step = 4;
+  const step = 3;
 
-  for (let y = 0; y < canvas.height; y += step) {
-    for (let x = 0; x < canvas.width; x += step) {
-      const i = (y * canvas.width + x) * 4;
-      if (data[i + 3] > 150) {
-        pts.push({
-          x: x - canvas.width / 2,
-          y: canvas.height / 2 - y,
-          z: 0
-        });
+  for (let y = 0; y < c.height; y += step) {
+    for (let x = 0; x < c.width; x += step) {
+      if (img[(y * c.width + x) * 4 + 3] > 128) {
+        pts.push({ x: x - c.width / 2, y: c.height / 2 - y, z: 0 });
       }
     }
   }
   return pts;
 }
 
-/* ================= Resize ================= */
 function onResize() {
-  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setSize(innerWidth, innerHeight);
+  composer.setSize(innerWidth, innerHeight);
 }
