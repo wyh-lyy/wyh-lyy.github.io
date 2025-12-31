@@ -32,54 +32,67 @@ function resize(){
 resize();
 addEventListener("resize", resize);
 
-/* ================= 设计画布（固定！） ================= */
+/* ================= 文案列表 ================= */
+const texts = [
+  "铛铛铛！现在是2025年最奇怪奖评选时刻!",
+  "嘿嘿，恭喜刘钰妍被评为年度最奇怪性格奖！",
+  "因此祝愿，在2026年烦恼少一点，快乐多一点"
+];
+
+let textIndex = 0;
+
+/* ================= 设计画布（固定） ================= */
 const DESIGN_W = 1000;
-const DESIGN_H = 420;
+const DESIGN_H = 300;
 
-/* ================= 字体画布 ================= */
-const textCanvas = document.createElement("canvas");
-textCanvas.width = DESIGN_W;
-textCanvas.height = DESIGN_H;
-const tctx = textCanvas.getContext("2d");
+/* ================= 生成点阵 ================= */
+function buildDots(text){
+  const tc = document.createElement("canvas");
+  tc.width = DESIGN_W;
+  tc.height = DESIGN_H;
+  const tctx = tc.getContext("2d");
 
-tctx.fillStyle = "#fff";
-tctx.textAlign = "center";
-tctx.textBaseline = "middle";
-tctx.font = "bold 140px 'PingFang SC','Microsoft YaHei',system-ui,sans-serif";
+  tctx.clearRect(0,0,DESIGN_W,DESIGN_H);
+  tctx.fillStyle = "#fff";
+  tctx.textAlign = "center";
+  tctx.textBaseline = "middle";
+  tctx.font = "bold 64px 'PingFang SC','Microsoft YaHei',system-ui,sans-serif";
+  tctx.fillText(text, DESIGN_W/2, DESIGN_H/2);
 
-tctx.fillText("2026 年", DESIGN_W/2, DESIGN_H/2 - 90);
-tctx.fillText("新年快乐", DESIGN_W/2, DESIGN_H/2 + 90);
+  const img = tctx.getImageData(0,0,DESIGN_W,DESIGN_H);
+  const dots = [];
+  const gap = 4;
 
-/* ================= 点阵采样 ================= */
-const img = tctx.getImageData(0,0,DESIGN_W,DESIGN_H);
-const dots = [];
-const gap = 4;
-
-for(let y=0;y<DESIGN_H;y+=gap){
-  for(let x=0;x<DESIGN_W;x+=gap){
-    const i = (y*DESIGN_W+x)*4;
-    if(img.data[i+3]>120){
-      dots.push({
-        tx:x, ty:y,
-        x:(Math.random()-0.5)*DESIGN_W*3,
-        y:(Math.random()-0.5)*DESIGN_H*3
-      });
+  for(let y=0;y<DESIGN_H;y+=gap){
+    for(let x=0;x<DESIGN_W;x+=gap){
+      const i = (y*DESIGN_W+x)*4;
+      if(img.data[i+3]>120){
+        dots.push({
+          tx:x, ty:y,
+          x:(Math.random()-0.5)*DESIGN_W*3,
+          y:(Math.random()-0.5)*DESIGN_H*3
+        });
+      }
     }
   }
+  return dots;
 }
 
-/* ================= 动画 ================= */
-const duration = 1800;
-let start = null;
+/* ================= 动画参数 ================= */
+const flyDuration = 1600;
+const stayDuration = 1500;
 
+let dots = buildDots(texts[textIndex]);
+let start = null;
+let phase = "fly";
+
+/* ================= 动画 ================= */
 function animate(t){
   if(!start) start = t;
-  const p = Math.min((t-start)/duration,1);
-  const ease = 1-Math.pow(1-p,4);
+  const elapsed = t - start;
 
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
-  /* 关键：整体等比缩放进屏幕 */
   const scale = Math.min(
     canvas.width / DESIGN_W,
     canvas.height / DESIGN_H
@@ -92,17 +105,42 @@ function animate(t){
   ctx.translate(ox,oy);
   ctx.scale(scale,scale);
 
+  let alpha = 1;
+  let ease = 1;
+
+  if(phase === "fly"){
+    const p = Math.min(elapsed / flyDuration, 1);
+    ease = 1 - Math.pow(1 - p, 4);
+    alpha = ease;
+    if(p >= 1){
+      phase = "stay";
+      start = t;
+    }
+  }
+
   dots.forEach(d=>{
     const x = d.x + (d.tx-d.x)*ease;
     const y = d.y + (d.ty-d.y)*ease;
-    ctx.fillStyle = `rgba(255,204,102,${ease})`;
+    ctx.fillStyle = `rgba(255,204,102,${alpha})`;
     ctx.fillRect(x,y,2,2);
   });
 
   ctx.restore();
 
-  if(p<1) requestAnimationFrame(animate);
+  if(phase === "stay" && elapsed > stayDuration){
+    textIndex++;
+    if(textIndex < texts.length){
+      dots = buildDots(texts[textIndex]);
+      phase = "fly";
+      start = t;
+    }else{
+      return; // 最后一段停住
+    }
+  }
+
+  requestAnimationFrame(animate);
 }
+
 requestAnimationFrame(animate);
 </script>
 
