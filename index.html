@@ -84,9 +84,9 @@ function buildDots(lines){
   return dots;
 }
 
-/* ================= 动画参数（阅读级慢速） ================= */
-const flyDuration = 4200;   // 飞入（更慢）
-const stayDuration = 3200; // 停留（更久）
+/* ================= 动画参数 ================= */
+const flyDuration  = 4200; // 飞入速度（保持）
+const stayDuration = 4200; // ✔ 成字后多停留 1 秒
 
 let dots = buildDots(texts[textIndex]);
 let start = null;
@@ -140,7 +140,7 @@ function animate(t){
       phase = "fly";
       start = t;
     }else{
-      return;
+      return; // 最后一段停住
     }
   }
 
