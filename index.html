@@ -56,9 +56,11 @@ function buildDots(lines){
   tctx.fillStyle = "#fff";
   tctx.textAlign = "center";
   tctx.textBaseline = "middle";
-  tctx.font = "bold 64px 'PingFang SC','Microsoft YaHei',system-ui,sans-serif";
 
-  const lineHeight = 80;
+  /* 字体稍微放大 */
+  tctx.font = "bold 72px 'PingFang SC','Microsoft YaHei',system-ui,sans-serif";
+
+  const lineHeight = 88;
   const startY = DESIGN_H/2 - (lines.length-1)*lineHeight/2;
 
   lines.forEach((line,i)=>{
@@ -85,8 +87,8 @@ function buildDots(lines){
 }
 
 /* ================= 动画参数 ================= */
-const flyDuration  = 4200; // 飞入速度（保持）
-const stayDuration = 4200; // ✔ 成字后多停留 1 秒
+const flyDuration  = 4200;
+const stayDuration = 4200;
 
 let dots = buildDots(texts[textIndex]);
 let start = null;
@@ -127,7 +129,9 @@ function animate(t){
   dots.forEach(d=>{
     const x = d.x + (d.tx-d.x)*ease;
     const y = d.y + (d.ty-d.y)*ease;
-    ctx.fillStyle = `rgba(255,204,102,${alpha})`;
+
+    /* 更深的金色 */
+    ctx.fillStyle = `rgba(220,170,80,${alpha})`;
     ctx.fillRect(x,y,2,2);
   });
 
@@ -140,7 +144,7 @@ function animate(t){
       phase = "fly";
       start = t;
     }else{
-      return; // 最后一段停住
+      return;
     }
   }
 
