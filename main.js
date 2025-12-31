@@ -1,150 +1,166 @@
-let scene, camera, renderer;
-let textGeo, textPos, glowGeo, glowPos;
-let textParticles, glowParticles;
+/* ======================================================
+   GitHub Pages Safe Bloom Particle Text
+   - NO module / NO import
+   - Works with CDN three.js + examples/js
+   ====================================================== */
 
-init();
-animate();
+console.log("Bloom Safe main.js loaded");
 
-function init(){
-  scene = new THREE.Scene();
-
-  camera = new THREE.PerspectiveCamera(
-    55,
-    window.innerWidth / window.innerHeight,
-    1,
-    3000
-  );
-  camera.position.z = 850;
-
-  renderer = new THREE.WebGLRenderer({ antialias:true });
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
-  renderer.setClearColor(0x000000,1);
-  document.body.appendChild(renderer.domElement);
-
-  createParticles();
-
-  window.addEventListener("resize", onResize);
+// ---------- 基础防御 ----------
+if (!window.THREE) {
+  alert("THREE not loaded");
+  throw new Error("THREE not found");
+}
+if (!THREE.EffectComposer || !THREE.UnrealBloomPass) {
+  alert("Bloom not loaded (EffectComposer / UnrealBloomPass)");
+  throw new Error("Bloom classes missing");
 }
 
-function createParticles(){
-  const top = getTextPoints("2026 年", 170);
-  const bottom = getTextPoints("新年快乐", 150)
-    .map(p=>({x:p.x, y:p.y-230, z:0}));
+// ---------- 场景 / 相机 / 渲染 ----------
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x000000);
 
-  const points = [...top, ...bottom];
+const camera = new THREE.PerspectiveCamera(
+  45,
+  window.innerWidth / window.innerHeight,
+  1,
+  2000
+);
+camera.position.z = 600;
 
-  // ===== 主粒子 =====
-  textGeo = new THREE.BufferGeometry();
-  textPos = new Float32Array(points.length * 3);
+const renderer = new THREE.WebGLRenderer({
+  antialias: true,
+  alpha: false,
+});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setClearColor(0x000000, 1);
+document.body.appendChild(renderer.domElement);
 
-  // ===== 光晕粒子（放大一圈）=====
-  glowGeo = new THREE.BufferGeometry();
-  glowPos = new Float32Array(points.length * 3);
+// ---------- 粒子文字 Canvas ----------
+const textCanvas = document.createElement("canvas");
+textCanvas.width = 1024;
+textCanvas.height = 512;
+const ctx = textCanvas.getContext("2d");
 
-  for(let i=0;i<points.length;i++){
-    const rx = (Math.random()-0.5)*2400;
-    const ry = (Math.random()-0.5)*2400;
-    const rz = (Math.random()-0.5)*1800;
+ctx.fillStyle = "black";
+ctx.fillRect(0, 0, textCanvas.width, textCanvas.height);
 
-    textPos[i*3]   = rx;
-    textPos[i*3+1] = ry;
-    textPos[i*3+2] = rz;
+ctx.font = "bold 140px sans-serif";
+ctx.textAlign = "center";
+ctx.textBaseline = "middle";
+ctx.fillStyle = "#ffffff";
+ctx.fillText("2026 年", 512, 180);
+ctx.fillText("新年快乐", 512, 330);
 
-    glowPos[i*3]   = rx;
-    glowPos[i*3+1] = ry;
-    glowPos[i*3+2] = rz;
-  }
+const imageData = ctx.getImageData(
+  0,
+  0,
+  textCanvas.width,
+  textCanvas.height
+).data;
 
-  textGeo.setAttribute("position", new THREE.BufferAttribute(textPos,3));
-  glowGeo.setAttribute("position", new THREE.BufferAttribute(glowPos,3));
+// ---------- 粒子生成 ----------
+const positions = [];
+const velocities = [];
+const colors = [];
 
-  textParticles = new THREE.Points(
-    textGeo,
-    new THREE.PointsMaterial({
-      color:new THREE.Color(1.0,0.78,0.25),
-      size:2.2,
-      transparent:true,
-      opacity:1,
-      depthWrite:false,
-      blending:THREE.AdditiveBlending
-    })
-  );
+for (let y = 0; y < textCanvas.height; y += 3) {
+  for (let x = 0; x < textCanvas.width; x += 3) {
+    const i = (y * textCanvas.width + x) * 4;
+    if (imageData[i] > 10) {
+      const px = x - textCanvas.width / 2;
+      const py = textCanvas.height / 2 - y;
 
-  glowParticles = new THREE.Points(
-    glowGeo,
-    new THREE.PointsMaterial({
-      color:new THREE.Color(1.0,0.6,0.2),
-      size:6.5,           // 关键：放大形成光晕
-      transparent:true,
-      opacity:0.18,
-      depthWrite:false,
-      blending:THREE.AdditiveBlending
-    })
-  );
+      positions.push(px, py, 0);
+      velocities.push(
+        (Math.random() - 0.5) * 0.2,
+        (Math.random() - 0.5) * 0.2,
+        Math.random() * 0.3
+      );
 
-  scene.add(glowParticles);
-  scene.add(textParticles);
-
-  flyIn(points);
-}
-
-function flyIn(points){
-  points.forEach((p,i)=>{
-    const d = Math.random()*0.6;
-
-    gsap.to(textPos,{
-      duration:2.6,
-      delay:d,
-      ease:"power3.out",
-      [i*3]:p.x,
-      [i*3+1]:p.y,
-      [i*3+2]:p.z,
-      onUpdate:()=>textGeo.attributes.position.needsUpdate=true
-    });
-
-    gsap.to(glowPos,{
-      duration:2.8,
-      delay:d,
-      ease:"power3.out",
-      [i*3]:p.x,
-      [i*3+1]:p.y,
-      [i*3+2]:p.z,
-      onUpdate:()=>glowGeo.attributes.position.needsUpdate=true
-    });
-  });
-}
-
-function getTextPoints(text, fontSize){
-  const c=document.createElement("canvas");
-  const ctx=c.getContext("2d");
-  c.width=1600; c.height=420;
-
-  ctx.fillStyle="#fff";
-  ctx.textAlign="center";
-  ctx.textBaseline="middle";
-  ctx.font=`900 ${fontSize}px system-ui,PingFang SC,Microsoft YaHei`;
-  ctx.fillText(text, c.width/2, c.height/2);
-
-  const d=ctx.getImageData(0,0,c.width,c.height).data;
-  const pts=[];
-  for(let y=0;y<c.height;y+=3){
-    for(let x=0;x<c.width;x+=3){
-      if(d[(y*c.width+x)*4+3]>120){
-        pts.push({x:x-c.width/2,y:c.height/2-y,z:0});
-      }
+      colors.push(1.0, 0.75, 0.25); // 金色
     }
   }
-  return pts;
 }
 
-function animate(){
+const geometry = new THREE.BufferGeometry();
+geometry.setAttribute(
+  "position",
+  new THREE.Float32BufferAttribute(positions, 3)
+);
+geometry.setAttribute(
+  "color",
+  new THREE.Float32BufferAttribute(colors, 3)
+);
+
+const material = new THREE.PointsMaterial({
+  size: 2.2,
+  vertexColors: true,
+  transparent: true,
+  opacity: 0.9,
+  depthWrite: false,
+  blending: THREE.AdditiveBlending,
+});
+
+const points = new THREE.Points(geometry, material);
+scene.add(points);
+
+// ---------- 第二层辉光粒子 ----------
+const glowMaterial = new THREE.PointsMaterial({
+  size: 4.5,
+  color: 0xffaa33,
+  transparent: true,
+  opacity: 0.15,
+  depthWrite: false,
+  blending: THREE.AdditiveBlending,
+});
+
+const glowPoints = new THREE.Points(geometry, glowMaterial);
+scene.add(glowPoints);
+
+// ---------- 后处理 Bloom ----------
+const composer = new THREE.EffectComposer(renderer);
+composer.addPass(new THREE.RenderPass(scene, camera));
+
+const bloomPass = new THREE.UnrealBloomPass(
+  new THREE.Vector2(window.innerWidth, window.innerHeight),
+  1.3,   // strength
+  0.6,   // radius
+  0.15   // threshold
+);
+composer.addPass(bloomPass);
+
+// ---------- 动画 ----------
+const pos = geometry.attributes.position.array;
+
+function animate() {
   requestAnimationFrame(animate);
-  renderer.render(scene,camera);
+
+  for (let i = 0; i < pos.length; i += 3) {
+    pos[i] += velocities[i];
+    pos[i + 1] += velocities[i + 1];
+    pos[i + 2] += velocities[i + 2];
+
+    // 呼吸感回拉
+    pos[i] *= 0.999;
+    pos[i + 1] *= 0.999;
+    pos[i + 2] *= 0.995;
+  }
+
+  geometry.attributes.position.needsUpdate = true;
+
+  glowPoints.rotation.z += 0.0005;
+
+  composer.render();
 }
 
-function onResize(){
-  camera.aspect=window.innerWidth/window.innerHeight;
+animate();
+
+// ---------- 自适应 ----------
+window.addEventListener("resize", () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth,window.innerHeight);
-}
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  composer.setSize(window.innerWidth, window.innerHeight);
+});
