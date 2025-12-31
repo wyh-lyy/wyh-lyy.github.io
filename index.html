@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>2026 新年快乐 · 粒子飞入</title>
+
+  <!-- 移动端适配 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background: #000;
+      overflow: hidden;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+    }
+    #tip {
+      position: fixed;
+      left: 12px;
+      bottom: 12px;
+      color: #ffcc66;
+      font-size: 13px;
+      opacity: 0.8;
+      user-select: none;
+      pointer-events: none;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="tip">高级琥珀金 · 粒子飞入 · 一次成字</div>
+
+  <!-- Three.js（必须在 main.js 之前） -->
+  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+
+  <!-- GSAP（粒子飞入动画必须） -->
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js"></script>
+
+  <!-- 你的粒子逻辑 -->
+  <script src="./main.js"></script>
+</body>
+</html>
